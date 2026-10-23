@@ -56,7 +56,12 @@ endif ()
 include(ExternalProject)
 include(ProcessorCount)
 
-ProcessorCount(NPROC)
+if ("$ENV{CMAKE_BUILD_PARALLEL_LEVEL}" MATCHES "^[1-9][0-9]*$")
+    # Direct make builds must respect the same limit as cmake --build.
+    set(NPROC "$ENV{CMAKE_BUILD_PARALLEL_LEVEL}")
+else ()
+    ProcessorCount(NPROC)
+endif ()
 if (NPROC EQUAL 0)
     set(NPROC 1)
 endif ()

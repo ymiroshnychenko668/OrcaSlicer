@@ -58,6 +58,8 @@ mkdir -p "$work_dir/logs"
 log=$(mktemp "$work_dir/logs/${action}.XXXXXX.log")
 exec > >(tee "$log") 2>&1
 trap 'rc=$?; echo "action_exit_code=$rc"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 printf 'action=%s\nsource=%s\nwork=%s\njobs=%s\n' "$action" "$source_dir" "$work_dir" "$jobs"
 date -u '+utc=%Y-%m-%dT%H:%M:%SZ'
 git -C "$source_dir" rev-parse HEAD HEAD:resources/profiles
