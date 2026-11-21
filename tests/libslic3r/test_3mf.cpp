@@ -1357,7 +1357,8 @@ SCENARIO("BBS 3MF round-trips per-plate IMEX state (parallel mode + head filamen
         src_plates.push_back(plate0);
 
         WHEN("the model is saved to BBS 3MF and loaded back") {
-            std::string test_file = std::string(TEST_DATA_DIR) + "/test_3mf/imex_roundtrip.3mf";
+            ScopedTemporaryFile temp(".3mf");
+            const std::string test_file = temp.string();
 
             StoreParams store_params;
             store_params.path            = test_file.c_str();
@@ -1376,7 +1377,6 @@ SCENARIO("BBS 3MF round-trips per-plate IMEX state (parallel mode + head filamen
             ConfigSubstitutionContext ctxt{ ForwardCompatibilitySubstitutionRule::Disable };
             bool loaded = load_bbs_3mf(test_file.c_str(), &dst_config, &ctxt, &dst_model,
                                        &dst_plates, &dst_presets, &is_bbl, &is_orca, &file_version);
-            boost::filesystem::remove(test_file);
 
             THEN("load succeeds") {
                 REQUIRE(loaded);
@@ -1432,7 +1432,8 @@ SCENARIO("BBS 3MF round-trips distinct IMEX state across multiple plates", "[3mf
         src_plates.push_back(plate1);
 
         WHEN("the model is saved to BBS 3MF and loaded back") {
-            std::string test_file = std::string(TEST_DATA_DIR) + "/test_3mf/imex_multiplate_roundtrip.3mf";
+            ScopedTemporaryFile temp(".3mf");
+            const std::string test_file = temp.string();
 
             StoreParams store_params;
             store_params.path            = test_file.c_str();
@@ -1451,7 +1452,6 @@ SCENARIO("BBS 3MF round-trips distinct IMEX state across multiple plates", "[3mf
             ConfigSubstitutionContext ctxt{ ForwardCompatibilitySubstitutionRule::Disable };
             bool loaded = load_bbs_3mf(test_file.c_str(), &dst_config, &ctxt, &dst_model,
                                        &dst_plates, &dst_presets, &is_bbl, &is_orca, &file_version);
-            boost::filesystem::remove(test_file);
 
             THEN("load succeeds and both plates are returned") {
                 REQUIRE(loaded);
@@ -1505,7 +1505,8 @@ SCENARIO("BBS 3MF does not emit IMEX metadata when plate is in primary mode", "[
         src_plates.push_back(plate0);
 
         WHEN("the model is saved to BBS 3MF and loaded back") {
-            std::string test_file = std::string(TEST_DATA_DIR) + "/test_3mf/imex_primary_roundtrip.3mf";
+            ScopedTemporaryFile temp(".3mf");
+            const std::string test_file = temp.string();
 
             StoreParams store_params;
             store_params.path            = test_file.c_str();
@@ -1524,7 +1525,6 @@ SCENARIO("BBS 3MF does not emit IMEX metadata when plate is in primary mode", "[
             ConfigSubstitutionContext ctxt{ ForwardCompatibilitySubstitutionRule::Disable };
             bool loaded = load_bbs_3mf(test_file.c_str(), &dst_config, &ctxt, &dst_model,
                                        &dst_plates, &dst_presets, &is_bbl, &is_orca, &file_version);
-            boost::filesystem::remove(test_file);
 
             THEN("load succeeds") {
                 REQUIRE(loaded);
