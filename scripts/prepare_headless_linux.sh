@@ -57,7 +57,7 @@ fi
 mkdir -p "$work_dir/logs"
 log=$(mktemp "$work_dir/logs/${action}.XXXXXX.log")
 exec > >(tee "$log") 2>&1
-trap 'rc=$?; echo "action_exit_code=$rc"' EXIT
+trap 'echo "action_exit_code=$?"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 printf 'action=%s\nsource=%s\nwork=%s\njobs=%s\n' "$action" "$source_dir" "$work_dir" "$jobs"
@@ -72,7 +72,8 @@ export CMAKE_BUILD_PARALLEL_LEVEL=$jobs
 # ExternalProject patches must not discover an enclosing, unrelated Git repo.
 # Configure from this directory too: deps/CMakeLists probes its current directory
 # and otherwise adds --directory paths relative to the Orca source checkout.
-export GIT_CEILING_DIRECTORIES="$(dirname -- "$work_dir")${GIT_CEILING_DIRECTORIES:+:$GIT_CEILING_DIRECTORIES}"
+GIT_CEILING_DIRECTORIES="$(dirname -- "$work_dir")${GIT_CEILING_DIRECTORIES:+:$GIT_CEILING_DIRECTORIES}"
+export GIT_CEILING_DIRECTORIES
 cd -- "$work_dir"
 deps_dir="$work_dir/deps"
 app_dir="$work_dir/app"
