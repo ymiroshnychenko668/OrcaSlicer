@@ -35,6 +35,31 @@
 
 using namespace Slic3r;
 
+TEST_CASE("Bridge width percentages use the diameter of the printing nozzle", "[Config]") {
+    auto config = DynamicPrintConfig::full_print_config();
+    config.set_deserialize_strict("nozzle_diameter", "0.4,0.6");
+    config.set_deserialize_strict("bridge_line_width", "100%");
+    CHECK(config.validate(true).count("bridge_line_width") == 0);
+    config.set_deserialize_strict("bridge_line_width", "101%");
+    CHECK(config.validate(true).count("bridge_line_width") == 1);
+    config.set_deserialize_strict("bridge_line_width", "0.5");
+    CHECK(config.validate(true).count("bridge_line_width") == 1);
+}
+
+TEST_CASE("Tall printers can use the build volume height for their extruder", "[Config]") {
+    auto config = DynamicPrintConfig::full_print_config();
+    config.set_deserialize_strict("printable_height", "2100");
+    config.set_deserialize_strict("extruder_printable_height", "2100");
+    CHECK(config.validate(true).count("extruder_printable_height") == 0);
+    config.set_deserialize_strict("extruder_printable_height", "2101");
+    CHECK(config.validate(true).count("extruder_printable_height") == 1);
+    config.set_deserialize_strict("printable_height", "500");
+    config.set_deserialize_strict("extruder_printable_height", "580");
+    CHECK(config.validate(true).count("extruder_printable_height") == 0);
+    config.set_deserialize_strict("extruder_printable_height", "1001");
+    CHECK(config.validate(true).count("extruder_printable_height") == 1);
+}
+
 SCENARIO("Generic config validation performs as expected.", "[Config]") {
     GIVEN("A config generated from default options") {
         Slic3r::DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();

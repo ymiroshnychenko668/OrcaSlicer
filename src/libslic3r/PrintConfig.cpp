@@ -1152,7 +1152,7 @@ void PrintConfigDef::init_common_params()
     def->tooltip  = L("Maximum printable height of this extruder which is limited by mechanism of printer.");
     def->sidetext = L("mm");	// millimeters, CIS languages need translation
     def->min      = 0;
-    def->max      = 1000;
+    def->max      = this->get("printable_height")->max;
     def->mode     = comAdvanced;
     def->set_default_value(new ConfigOptionFloatsNullable{0});
 
@@ -12599,7 +12599,9 @@ std::map<std::string, std::string> validate(const FullPrintConfig &cfg, bool und
             "skeleton_infill_line_width"};
         for (size_t i = 0; i < sizeof(widths) / sizeof(widths[i]); ++ i) {
             std::string key(widths[i]);
-            double abs_width = cfg.get_abs_value(key, max_nozzle_diameter);
+            // A percentage bridge width is relative to the nozzle printing that bridge.
+            // Print::validate and LayerRegion use the same nozzle for both quantities.
+            double abs_width = cfg.get_abs_value(key, key == "bridge_line_width" ? min_nozzle_diameter : max_nozzle_diameter);
             double allowed_max = (key == "bridge_line_width") ? min_nozzle_diameter : MAX_LINE_WIDTH_MULTIPLIER * max_nozzle_diameter;
             if (abs_width > allowed_max) {
                 if (key == "bridge_line_width")
@@ -12610,6 +12612,16 @@ std::map<std::string, std::string> validate(const FullPrintConfig &cfg, bool und
             }
         }
     }
+
+    // Existing presets may describe extruder travel above the usable bed height.
+    // Extend the historical 1000 mm travel limit only for taller build volumes.
+    const double extruder_height_limit = std::max(1000., cfg.printable_height.value);
+    for (const double height : cfg.extruder_printable_height.values)
+        if (height > extruder_height_limit) {
+            error_message.emplace("extruder_printable_height", Slic3r::format(
+                _u8L("%1% not in range [%2%, %3%]"), height, 0, extruder_height_limit));
+            break;
+        }
 
     // Out of range validation of numeric values.
     for (const std::string &opt_key : cfg.keys()) {
