@@ -6292,7 +6292,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         bool _add_project_config_file_to_archive(mz_zip_archive& archive, const DynamicPrintConfig &config, Model& model);
         //BBS: add project embedded preset files
         bool _add_project_embedded_presets_to_archive(mz_zip_archive& archive, Model& model, std::vector<Preset*> project_presets);
-        bool _add_model_config_file_to_archive(mz_zip_archive& archive, const Model& model, PlateDataPtrs& plate_data_list, const ObjectToObjectDataMap &objects_data, const DynamicPrintConfig& config, int export_plate_idx = -1, bool save_gcode = true, bool use_loaded_id = false);
+        bool _add_model_config_file_to_archive(mz_zip_archive& archive, const Model& model, PlateDataPtrs& plate_data_list, const ObjectToObjectDataMap &objects_data, const DynamicPrintConfig& config, const std::set<int>& archived_bboxes, int export_plate_idx = -1, bool save_gcode = true, bool use_loaded_id = false);
         bool _add_cut_information_file_to_archive(mz_zip_archive &archive, Model &model);
         bool _add_slice_info_config_file_to_archive(mz_zip_archive &archive, const Model &model, PlateDataPtrs &plate_data_list, const ObjectToObjectDataMap &objects_data, const DynamicPrintConfig& config);
         bool _add_filament_sequence_file_to_archive(mz_zip_archive& archive, const PlateDataPtrs& plate_data_list);
@@ -6655,6 +6655,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         }
 
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ":" <<__LINE__ << boost::format(",before add calibration boundingbox, count %1%\n")%id_bboxes.size();
+        std::set<int> archived_bboxes;
         if (!m_skip_static && id_bboxes.size() > 0) {
             // Adds the file Metadata/calibration_p[X].png.
             for (unsigned int index = 0; index < id_bboxes.size(); index++)
@@ -6665,6 +6666,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                         close_zip_writer(&archive);
                         return false;
                     }
+                    archived_bboxes.insert(index);
                 }
             }
         }
@@ -6831,7 +6833,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         // This file contains all the attributes of all ModelObjects and their ModelVolumes (names, parameter overrides).
         // As there is just a single Indexed Triangle Set data stored per ModelObject, offsets of volumes into their respective Indexed Triangle Set data
         // is stored here as well.
-        if (!_add_model_config_file_to_archive(archive, model, plate_data_list, objects_data, *config, export_plate_idx, m_save_gcode, m_use_loaded_id)) {
+        if (!_add_model_config_file_to_archive(archive, model, plate_data_list, objects_data, *config, archived_bboxes, export_plate_idx, m_save_gcode, m_use_loaded_id)) {
             BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ":" << __LINE__ << boost::format(", _add_model_config_file_to_archive failed\n");
             return false;
         }
@@ -6973,6 +6975,9 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ":" << __LINE__ << boost::format(", Unable to add thumbnail file to archive\n");
         }
 
+        if (!res)
+            return false;
+
         if (generate_small_thumbnail && thumbnail_data.is_valid()) {
             //generate small size of thumbnail
             std::vector<unsigned char> small_pixels;
@@ -7007,7 +7012,8 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             }
             size_t small_png_size = 0;
             void* small_png_data = tdefl_write_image_to_png_file_in_memory_ex((const void*)small_pixels.data(), PLATE_THUMBNAIL_SMALL_WIDTH, PLATE_THUMBNAIL_SMALL_HEIGHT, 4, &small_png_size, MZ_DEFAULT_COMPRESSION, 1);
-            if (png_data != nullptr) {
+            res = false;
+            if (small_png_data != nullptr) {
                 std::string thumbnail_name = (boost::format("%1%_%2%_small.png") % local_path % (index + 1)).str();
                 res = mz_zip_writer_add_mem(&archive, thumbnail_name.c_str(), (const void*)small_png_data, small_png_size, MZ_NO_COMPRESSION);
                 mz_free(small_png_data);
@@ -8293,7 +8299,7 @@ static void add_texture_displacement(std::stringstream &stream, const ModelVolum
            << VALUE_ATTR << "=\"" << xml_escape(json_path) << "\"/>\n";
 }
 
-bool _BBS_3MF_Exporter::_add_model_config_file_to_archive(mz_zip_archive& archive, const Model& model, PlateDataPtrs& plate_data_list, const ObjectToObjectDataMap &objects_data, const DynamicPrintConfig& config, int export_plate_idx, bool save_gcode, bool use_loaded_id)
+bool _BBS_3MF_Exporter::_add_model_config_file_to_archive(mz_zip_archive& archive, const Model& model, PlateDataPtrs& plate_data_list, const ObjectToObjectDataMap &objects_data, const DynamicPrintConfig& config, const std::set<int>& archived_bboxes, int export_plate_idx, bool save_gcode, bool use_loaded_id)
     {
         std::stringstream stream;
         // Store mesh transformation in full precision, as the volumes are stored transformed and they need to be transformed back
@@ -8567,7 +8573,9 @@ bool _BBS_3MF_Exporter::_add_model_config_file_to_archive(mz_zip_archive& archiv
                     std::string pattern_file_in_3mf = (boost::format(PATTERN_FILE_FORMAT) % (plate_data->plate_index + 1)).str();
                     stream << "    <" << METADATA_TAG << " " << KEY_ATTR << "=\"" << PATTERN_FILE_ATTR << "\" " << VALUE_ATTR << "=\"" << std::boolalpha << pattern_file_in_3mf << "\"/>\n";
                 }*/
-                if (!plate_data->pattern_bbox_file.empty()) {
+                // Backups reference the existing static files. Standalone projects
+                // reference the first-layer data actually written by this export.
+                if (archived_bboxes.count(plate_data->plate_index) || (m_skip_static && !plate_data->pattern_bbox_file.empty())) {
                     std::string pattern_bbox_file_in_3mf = (boost::format(PATTERN_CONFIG_FILE_FORMAT) % (plate_data->plate_index + 1)).str();
                     stream << "    <" << METADATA_TAG << " " << KEY_ATTR << "=\"" << PATTERN_BBOX_FILE_ATTR << "\" " << VALUE_ATTR << "=\"" << std::boolalpha << pattern_bbox_file_in_3mf << "\"/>\n";
                 }

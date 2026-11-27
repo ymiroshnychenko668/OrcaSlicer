@@ -40,9 +40,7 @@
 
 #ifdef __WXGTK__
 #include "LinuxDisplayBackend.hpp"
-#ifdef wxHAS_EGL
 #include <EGL/egl.h>
-#endif
 #endif
 
 namespace Slic3r {
@@ -257,8 +255,8 @@ bool OpenGLManager::init_gl(bool popup_error)
 {
     if (!m_gl_initialized) {
         int version = 0;
-#if defined(__WXGTK__) && defined(wxHAS_EGL)
-        if (is_running_on_wayland()) {
+#ifdef __WXGTK__
+        if (eglGetCurrentContext() != EGL_NO_CONTEXT) {
             // On EGL/Wayland, gladLoaderLoadGL() dlopen's libGL.so then
             // immediately dlclose's it. Since nothing else holds libGL.so
             // open (unlike GLX where the context keeps it loaded), the
